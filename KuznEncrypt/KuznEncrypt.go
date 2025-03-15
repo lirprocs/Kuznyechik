@@ -1,8 +1,6 @@
 package KuznEncrypt
 
-import "fmt"
-
-var Pi = [256]byte{
+var pi = [256]byte{
 	252, 238, 221, 17, 207, 110, 49, 22, 251, 196, 250, 218, 35, 197, 4, 77,
 	233, 119, 240, 219, 147, 46, 153, 186, 23, 54, 241, 187, 20, 205, 95, 193,
 	249, 24, 101, 90, 226, 92, 239, 33, 129, 28, 60, 66, 139, 1, 142, 79,
@@ -20,36 +18,43 @@ var Pi = [256]byte{
 	32, 113, 103, 164, 45, 43, 9, 91, 203, 155, 37, 208, 190, 229, 108, 82,
 	89, 166, 116, 210, 230, 244, 180, 192, 209, 102, 175, 194, 57, 75, 99, 182}
 
-var LFactors = [16]byte{148, 32, 133, 16, 194, 192, 1, 251, 1, 192, 194, 16, 133, 32, 148, 1}
+var lFactors = [16]byte{148, 32, 133, 16, 194, 192, 1, 251, 1, 192, 194, 16, 133, 32, 148, 1}
 
-func Encrypt(plainText [16]byte, keys [10][16]byte) [16]byte {
-	state := XORBytes(plainText, keys[0])
+func Encrypt(plainText [16]byte, masterKey [32]byte) [16]byte {
+	keys := KeySchedule(masterKey)
+
+	state := xorBytes(plainText, keys[0])
 	for i := 1; i < 10; i++ {
-		state = XORBytes(L(S(state)), keys[i])
+		state = xorBytes(l(s(state)), keys[i])
 	}
 	return state
 }
 
-func S(a [16]byte) [16]byte {
+func s(a [16]byte) [16]byte {
 	for i := 0; i < 16; i++ {
-		a[i] = Pi[a[i]]
+		a[i] = pi[a[i]]
 	}
 	return a
 }
 
-func R(a [16]byte) [16]byte {
+func l(a [16]byte) [16]byte {
+	for i := 0; i < 16; i++ {
+		a = r(a)
+	}
+	return a
+}
+
+func r(a [16]byte) [16]byte {
 	var z byte
 	for i := 0; i < 16; i++ {
-		z ^= GF256Mul(a[i], LFactors[i])
+		z ^= gf256Mul(a[i], lFactors[i])
 	}
-	for i := 15; i > 0; i-- {
-		a[i] = a[i-1]
-	}
+	copy(a[1:], a[:15])
 	a[0] = z
 	return a
 }
 
-func GF256Mul(a, b byte) byte {
+func gf256Mul(a, b byte) byte {
 	var p byte
 	for i := 0; i < 8; i++ {
 		if (b & 1) != 0 {
@@ -65,19 +70,7 @@ func GF256Mul(a, b byte) byte {
 	return p
 }
 
-func L(a [16]byte) [16]byte {
-	for i := 0; i < 16; i++ {
-		a = R(a)
-	}
-	return a
-}
-
-func F(left, c, right [16]byte) [16]byte {
-	tmp := XORBytes(L(S(XORBytes(left, c))), right)
-	return tmp
-}
-
-func XORBytes(a, b [16]byte) [16]byte {
+func xorBytes(a, b [16]byte) [16]byte {
 	var c [16]byte
 	for i := range a {
 		c[i] = a[i] ^ b[i]
@@ -92,11 +85,8 @@ func KeySchedule(masterKey [32]byte) [10][16]byte {
 	copy(keys[0][:], masterKey[:16])
 	copy(keys[1][:], masterKey[16:])
 
-	fmt.Printf("K1: %x\n", keys[0])
-	fmt.Printf("K2: %x\n", keys[1])
-
 	for i := 0; i < 32; i++ {
-		C[i] = L(Vec128(i + 1))
+		C[i] = l(vec128(i + 1))
 	}
 
 	for i := 0; i < 4; i++ {
@@ -105,7 +95,7 @@ func KeySchedule(masterKey [32]byte) [10][16]byte {
 		left[0] = keys[2*i]
 		right[0] = keys[2*i+1]
 		for j := 0; j < 8; j++ {
-			left[j+1] = F(left[j], C[8*i+j], right[j])
+			left[j+1] = f(left[j], C[8*i+j], right[j])
 			right[j+1] = left[j]
 		}
 		keys[2*i+2] = left[8]
@@ -114,7 +104,12 @@ func KeySchedule(masterKey [32]byte) [10][16]byte {
 	return keys
 }
 
-func Vec128(i int) [16]byte {
+func f(left, c, right [16]byte) [16]byte {
+	tmp := xorBytes(l(s(xorBytes(left, c))), right)
+	return tmp
+}
+
+func vec128(i int) [16]byte {
 	var v [16]byte
 	v[15] = byte(i)
 	return v

@@ -1,6 +1,10 @@
 package KuznDecrypt
 
-var PiInv = [256]byte{
+import (
+	"Kuznyechik/KuznEncrypt"
+)
+
+var piInv = [256]byte{
 	165, 45, 50, 143, 14, 48, 56, 192, 84, 230, 158, 57, 85, 126, 82, 145,
 	100, 3, 87, 90, 28, 96, 7, 24, 33, 114, 168, 209, 41, 198, 164, 63,
 	224, 39, 141, 12, 130, 234, 174, 180, 154, 99, 73, 229, 66, 228, 21, 183,
@@ -15,40 +19,51 @@ var PiInv = [256]byte{
 	150, 111, 110, 194, 246, 80, 255, 93, 169, 142, 23, 27, 151, 125, 236, 88,
 	247, 31, 251, 124, 9, 13, 122, 103, 69, 135, 220, 232, 79, 29, 78, 4,
 	235, 248, 243, 62, 61, 189, 138, 136, 221, 205, 11, 19, 152, 2, 147, 128,
-	144, 208, 36, 52, 203, 237, 244, 206, 153, 16, 68, 64, 146, 58, 1, 3,
+	144, 208, 36, 52, 203, 237, 244, 206, 153, 16, 68, 64, 146, 58, 1, 38,
 	18, 26, 72, 104, 245, 129, 139, 199, 214, 32, 10, 8, 0, 76, 215, 116,
 }
 
-var LFactors = [16]byte{148, 32, 133, 16, 194, 192, 1, 251, 1, 192, 194, 16, 133, 32, 148, 1}
+var lFactors = [16]byte{148, 32, 133, 16, 194, 192, 1, 251, 1, 192, 194, 16, 133, 32, 148, 1}
 
-func Decrypt(plainText [16]byte, keys [10][16]byte) [16]byte {
-	state := XORBytes(plainText, keys[0])
+func Decrypt(cipherText [16]byte, masterKey [32]byte) [16]byte {
+	keys := KuznEncrypt.KeySchedule(masterKey)
+
+	state := xorBytes(cipherText, keys[9])
 	for i := 8; i >= 0; i-- {
-		state = XORBytes(L(S(state)), keys[i])
+		state = xorBytes(sInv(lInv(state)), keys[i])
 	}
 	return state
 }
 
-func SInv(a [16]byte) [16]byte {
+func sInv(a [16]byte) [16]byte {
 	for i := 0; i < 16; i++ {
-		a[i] = PiInv[a[i]]
+		a[i] = piInv[a[i]]
 	}
 	return a
 }
 
-func RInv(a [16]byte) [16]byte {
+func lInv(a [16]byte) [16]byte {
+	for i := 0; i < 16; i++ {
+		a = rInv(a)
+	}
+	return a
+}
+
+func rInv(a [16]byte) [16]byte {
+	oldFirst := a[0]
+
+	copy(a[:15], a[1:])
 	var z byte
-	for i := 0; i < 16; i++ {
-		z ^= GF256Mul(a[i], LFactors[i])
+	for i := 0; i < 15; i++ {
+		z ^= gf256Mul(a[i], lFactors[i])
 	}
-	for i := 15; i > 0; i-- {
-		a[i] = a[i-1]
-	}
-	a[0] = z
+	z ^= gf256Mul(oldFirst, lFactors[15])
+
+	a[15] = z
 	return a
 }
 
-func GF256Mul(a, b byte) byte {
+func gf256Mul(a, b byte) byte {
 	var p byte
 	for i := 0; i < 8; i++ {
 		if (b & 1) != 0 {
@@ -64,19 +79,7 @@ func GF256Mul(a, b byte) byte {
 	return p
 }
 
-func LInv(a [16]byte) [16]byte {
-	for i := 0; i < 16; i++ {
-		a = RInv(a)
-	}
-	return a
-}
-
-func FInv(left, c, right [16]byte) [16]byte {
-	tmp := XORBytes(SInv(LInv(XORBytes(left, c))), right)
-	return tmp
-}
-
-func XORBytes(a, b [16]byte) [16]byte {
+func xorBytes(a, b [16]byte) [16]byte {
 	var c [16]byte
 	for i := range a {
 		c[i] = a[i] ^ b[i]
