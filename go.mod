@@ -1,1 +1,1 @@
-module Kuznyechik
+module github.com/lirprocs/Kuznyechik
