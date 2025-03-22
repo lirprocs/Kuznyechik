@@ -63,7 +63,7 @@ func gf256Mul(a, b byte) byte {
 		hiBitSet := (a & 0x80) != 0
 		a <<= 1
 		if hiBitSet {
-			a ^= 0xC3
+			a ^= 0xC3 //
 		}
 		b >>= 1
 	}

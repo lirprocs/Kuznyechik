@@ -1,7 +1,7 @@
 package KuznDecrypt
 
 import (
-	"Kuznyechik/KuznEncrypt"
+	"github.com/lirprocs/Kuznyechik/KuznEncrypt"
 )
 
 var piInv = [256]byte{
